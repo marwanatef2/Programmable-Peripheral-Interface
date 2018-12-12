@@ -16,7 +16,7 @@ assign address = {a1,a0};
 
 // 3) reset
 wire int_reset;
-assign int_reset = reset | (cwr[7]==0) | (~wrb & (address == 2'b11));
+assign int_reset = reset | ~cwr[7] | (~wrb & (address == 2'b11));
 
 // 4) latching of data and ports
 reg [7:0] latch_data, latch_portA, latch_portB, latch_portC;
@@ -33,10 +33,7 @@ reg enable_portA, enable_portB, enable_upper_portC, enable_lower_portC;
 
 // 7) groups control for mode 0
 reg groupA_mode0, groupB_mode0;
-
-// 8) bit set/reset
-//reg [2:0] pin_selected;
-//reg bit_set; 
+ 
 
 // different modes of operations
 // 1] mode 0 i/o
@@ -143,17 +140,6 @@ else enable_lower_portC = 0;
 
 end
 end
-
-/*
-else
-//for bit set/reset
-begin
-pin_selected = {cwr[3],cwr[2],cwr[1]};
-bit_set = cwr[0];
-out_portC[pin_selected]=bit_set;
-end
-*/
-
 end
 end
 
@@ -202,9 +188,18 @@ begin
 
 if (int_reset)
 begin
+
+//BSR functionality
+if (~cwr[7])
+out_portC[cwr[3:1]] <= cwr[0];
+
+else
+begin
 out_portA <= 8'hzz;
 out_portB <= 8'hzz;
 out_portC <= 8'hzz;
+end
+
 end
 
 //if port A is addressed and output
@@ -240,7 +235,7 @@ end
 endmodule
 
 
-
+// the test bench module
 module ppi_testbench1();
 
 wire[7:0] pA, pB, pC, D;
@@ -248,7 +243,7 @@ wire a1,a0;
 reg rdb, wrb, rst, cs;
 reg [7:0] drive_pA, drive_pB, drive_pC, drive_D, temp_D;
 
-parameter cycle = 100;
+parameter cycle = 50;
 
 assign pA = drive_pA;
 assign pB = drive_pB;
@@ -273,6 +268,8 @@ begin
      rst = 0;
 
      #cycle;
+
+$monitor("portC - %b", pC);
 
      task_reset;
 
@@ -335,7 +332,15 @@ begin
     write_port;
     drive_D = 8'hzz;
 
+    // bit set-reset of port C
+    //reset bit 1 of port C
+    temp_D = 8'b00000010;
+    CWR_write(temp_D);
+    
+
+
 end
+
 task write_port;
 begin
      wrb = 1;
